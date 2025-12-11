@@ -33,7 +33,7 @@ MarketAlgoXは、FinancialModelingPrep APIから米国株式データを取得�
 - 📊 **レーティング計算**: RS Rating、EPS Rating、Composite Rating等のIBDレーティングを計算
 - 🔍 **スクリーニング**: 6つのIBDスクリーナーで有望銘柄を抽出
 - 💾 **JSON出力**: 日次スクリーニング結果をJSON形式で保存（`YYYYMMDD.json`）
-- 🤖 **AI分析**: OpenAI GPT-4oが各スクリーナーでオススメ銘柄を選定し、Industry Group傾向を分析
+- 🤖 **AI分析**: OpenAI GPT-4.1が各スクリーナーでオススメ銘柄を選定し、Industry Group傾向を分析
 - 🐦 **X投稿**: 分析結果を自動的にX (Twitter)に投稿（個別ツイート×6、日本語140文字対応）
 - ⏰ **自動実行**: Cronで毎日朝6時（日本時間、火〜土曜）に自動実行
 
