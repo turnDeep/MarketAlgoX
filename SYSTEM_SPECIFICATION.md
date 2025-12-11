@@ -1,7 +1,7 @@
 # MarketAlgoX システム開発仕様書
 
 ## バージョン情報
-- **バージョン**: 1.0.0
+- **バージョン**: 1.1.0
 - **作成日**: 2025-12-11
 - **最終更新日**: 2025-12-11
 
@@ -72,12 +72,12 @@ MarketAlgoXは、米国株式市場のスクリーニング、AI分析、自動�
 - **FR-DC-05**: データをSQLiteデータベースに保存
 
 ### 3.2 スクリーニング機能
-- **FR-SC-01**: Momentum 97スクリーナーを実行
-- **FR-SC-02**: Explosive Estimated EPS Growth Stocksスクリーナーを実行
-- **FR-SC-03**: Up on Volume Listスクリーナーを実行
-- **FR-SC-04**: Top 2% RS Rating Listスクリーナーを実行
-- **FR-SC-05**: 4% Bullish Yesterdayスクリーナーを実行
-- **FR-SC-06**: Healthy Chart Watch Listスクリーナーを実行
+- **FR-SC-01**: 短期中期長期の最強銘柄スクリーナーを実行
+- **FR-SC-02**: 爆発的EPS成長銘柄スクリーナーを実行
+- **FR-SC-03**: 出来高急増上昇銘柄スクリーナーを実行
+- **FR-SC-04**: 相対強度トップ2%銘柄スクリーナーを実行
+- **FR-SC-05**: 急騰直後銘柄スクリーナーを実行
+- **FR-SC-06**: 健全チャート銘柄スクリーナーを実行
 - **FR-SC-07**: スクリーニング結果をJSON形式で保存
 
 ### 3.3 AI分析機能
@@ -774,7 +774,7 @@ if __name__ == "__main__":
 
 ## 8. スクリーナー仕様
 
-### 8.1 Momentum 97 スクリーナー
+### 8.1 短期中期長期の最強銘柄 (Momentum 97)
 
 **目的**: 短期・中期・長期すべてでトップパフォーマンスの銘柄を抽出
 
@@ -786,7 +786,9 @@ if __name__ == "__main__":
 **説明**:
 過去1ヶ月、3ヶ月、6ヶ月のすべての期間でパフォーマンスが上位3%に入る強力なモメンタムを持つ銘柄を抽出します。
 
-### 8.2 Explosive Estimated EPS Growth Stocks スクリーナー
+**英語名**: Momentum 97
+
+### 8.2 爆発的EPS成長銘柄 (Explosive Estimated EPS Growth Stocks)
 
 **目的**: 爆発的なEPS成長を示す強気銘柄を抽出
 
@@ -800,7 +802,9 @@ if __name__ == "__main__":
 **説明**:
 直近四半期のEPS成長率が100%以上で、相対的強さも高い銘柄を抽出します。
 
-### 8.3 Up on Volume List スクリーナー
+**英語名**: Explosive Estimated EPS Growth Stocks
+
+### 8.3 出来高急増上昇銘柄 (Up on Volume List)
 
 **目的**: 出来高を伴って上昇している銘柄を抽出
 
@@ -818,7 +822,9 @@ if __name__ == "__main__":
 **説明**:
 出来高が平常時より20%以上増加しながら価格が上昇している銘柄を抽出します。
 
-### 8.4 Top 2% RS Rating List スクリーナー
+**英語名**: Up on Volume List
+
+### 8.4 相対強度トップ2%銘柄 (Top 2% RS Rating List)
 
 **目的**: 相対的強さが極めて高い銘柄を抽出
 
@@ -833,7 +839,9 @@ if __name__ == "__main__":
 **説明**:
 RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレンドを形成している銘柄を抽出します。
 
-### 8.5 4% Bullish Yesterday スクリーナー
+**英語名**: Top 2% RS Rating List
+
+### 8.5 急騰直後銘柄 (4% Bullish Yesterday)
 
 **目的**: 前日に強い上昇を見せた銘柄を抽出
 
@@ -850,7 +858,9 @@ RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレ�
 **説明**:
 前日に4%以上上昇し、出来高も平常時以上の銘柄を抽出します。
 
-### 8.6 Healthy Chart Watch List スクリーナー
+**英語名**: 4% Bullish Yesterday
+
+### 8.6 健全チャート銘柄 (Healthy Chart Watch List)
 
 **目的**: 健全なチャートパターンを持つ銘柄を抽出
 
@@ -865,6 +875,21 @@ RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレ�
 
 **説明**:
 短期・中期・長期の移動平均がすべて理想的な上昇トレンドを形成し、RS Lineが新高値の銘柄を抽出します。
+
+**英語名**: Healthy Chart Watch List
+
+### 8.7 スクリーナー名称対応表
+
+| 日本語名 | 英語名 | 略称 |
+|---------|--------|------|
+| 短期中期長期の最強銘柄 | Momentum 97 | M97 |
+| 爆発的EPS成長銘柄 | Explosive Estimated EPS Growth Stocks | EPS爆 |
+| 出来高急増上昇銘柄 | Up on Volume List | 出増 |
+| 相対強度トップ2%銘柄 | Top 2% RS Rating List | RS2% |
+| 急騰直後銘柄 | 4% Bullish Yesterday | 急騰 |
+| 健全チャート銘柄 | Healthy Chart Watch List | 健全 |
+
+**注意**: JSONデータやプログラム内では日本語名を使用し、参照用に英語名も併記します。
 
 ---
 
@@ -881,7 +906,8 @@ RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレ�
   "market_date": "2025-12-10",
   "screeners": [
     {
-      "name": "Momentum 97",
+      "name": "短期中期長期の最強銘柄",
+      "english_name": "Momentum 97",
       "description": "短期・中期・長期すべてでトップパフォーマンスの銘柄を抽出",
       "criteria": {
         "1M Rank (Pct)": "≥ 97%",
@@ -916,7 +942,8 @@ RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレ�
       ]
     },
     {
-      "name": "Explosive Estimated EPS Growth Stocks",
+      "name": "爆発的EPS成長銘柄",
+      "english_name": "Explosive Estimated EPS Growth Stocks",
       "description": "爆発的なEPS成長を示す強気銘柄を抽出",
       "criteria": {
         "RS Rating": "≥ 80",
@@ -1107,8 +1134,12 @@ text = response.text
 出力形式:
 {
   "recommended_stocks": {
-    "Momentum 97": {
+    "短期中期長期の最強銘柄": {
       "ticker": "AAPL",
+      "reason": "..."
+    },
+    "爆発的EPS成長銘柄": {
+      "ticker": "NVDA",
       "reason": "..."
     },
     ...
@@ -1490,6 +1521,7 @@ pytest --cov=src tests/
 
 | バージョン | 日付 | 変更内容 | 作成者 |
 |------------|------|----------|--------|
+| 1.1.0 | 2025-12-11 | スクリーナー名を分かりやすい日本語名に変更 | Claude |
 | 1.0.0 | 2025-12-11 | 初版作成 | Claude |
 
 ---
