@@ -24,4 +24,5 @@ curl-cffi>=0.13.0
 python-dotenv==0.21.0
 
 # Chart Generation
-kaleido>=0.2.1
+mplfinance>=0.12.9b7
+matplotlib>=3.7.1

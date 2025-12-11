@@ -2,7 +2,7 @@
 """
 チャート生成モジュール
 
-SQLiteデータベースから株価データを取得し、Plotlyでチャートを生成します。
+SQLiteデータベースから株価データを取得し、mplfinanceでチャートを生成します。
 """
 
 import os
@@ -10,8 +10,8 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import mplfinance as mpf
+import matplotlib.pyplot as plt
 
 
 class ChartGenerator:
@@ -76,6 +76,19 @@ class ChartGenerator:
             # 日付をdatetime型に変換
             df['date'] = pd.to_datetime(df['date'])
 
+            # mplfinanceにはDatetimeIndexが必要
+            df.set_index('date', inplace=True)
+            df.index.name = 'Date'
+
+            # カラム名をmplfinanceの期待する形式に（Open, High, Low, Close, Volume）
+            df.rename(columns={
+                'open': 'Open',
+                'high': 'High',
+                'low': 'Low',
+                'close': 'Close',
+                'volume': 'Volume'
+            }, inplace=True)
+
             return df
 
         except Exception as e:
@@ -97,7 +110,7 @@ class ChartGenerator:
             ticker: ティッカーシンボル
             company_name: 会社名（チャートタイトル用）
             months: 表示する月数（デフォルト: 3ヶ月）
-            width: チャート幅（ピクセル）
+            width: チャート幅（ピクセル）- mplfinanceではfigsize (inch) を使用するため概算変換
             height: チャート高さ（ピクセル）
 
         Returns:
@@ -110,81 +123,31 @@ class ChartGenerator:
             return None
 
         try:
-            # サブプロットを作成（価格チャート + 出来高）
-            fig = make_subplots(
-                rows=2, cols=1,
-                shared_xaxes=True,
-                vertical_spacing=0.03,
-                subplot_titles=(f'{ticker} - {company_name}' if company_name else ticker, 'Volume'),
-                row_width=[0.2, 0.7]
-            )
-
-            # ローソク足チャート
-            fig.add_trace(
-                go.Candlestick(
-                    x=df['date'],
-                    open=df['open'],
-                    high=df['high'],
-                    low=df['low'],
-                    close=df['close'],
-                    name='Price',
-                    increasing_line_color='#26a69a',  # 緑（上昇）
-                    decreasing_line_color='#ef5350'   # 赤（下降）
-                ),
-                row=1, col=1
-            )
-
-            # 出来高バーチャート
-            colors = ['#26a69a' if row['close'] >= row['open'] else '#ef5350'
-                     for _, row in df.iterrows()]
-
-            fig.add_trace(
-                go.Bar(
-                    x=df['date'],
-                    y=df['volume'],
-                    name='Volume',
-                    marker_color=colors,
-                    showlegend=False
-                ),
-                row=2, col=1
-            )
-
-            # レイアウト設定
-            fig.update_layout(
-                title=dict(
-                    text=f'{ticker} - {months}ヶ月チャート' if not company_name else f'{company_name} ({ticker}) - {months}ヶ月チャート',
-                    font=dict(size=20, family='Arial, sans-serif')
-                ),
-                xaxis_rangeslider_visible=False,
-                width=width,
-                height=height,
-                template='plotly_white',
-                hovermode='x unified',
-                font=dict(family='Arial, sans-serif', size=12)
-            )
-
-            # X軸の設定
-            fig.update_xaxes(
-                title_text="Date",
-                row=2, col=1,
-                gridcolor='lightgray'
-            )
-
-            # Y軸の設定
-            fig.update_yaxes(
-                title_text="Price ($)",
-                row=1, col=1,
-                gridcolor='lightgray'
-            )
-            fig.update_yaxes(
-                title_text="Volume",
-                row=2, col=1,
-                gridcolor='lightgray'
-            )
-
-            # 画像として保存
             output_path = os.path.join(self.output_dir, f'{ticker}_{months}m.png')
-            fig.write_image(output_path)
+
+            # タイトル作成
+            title = f'{ticker} - {company_name}' if company_name else ticker
+            title += f' ({months} months)'
+
+            # スタイル設定
+            # IBDスタイルに近いものを作成するか、既存のスタイルを使用
+            mc = mpf.make_marketcolors(up='#26a69a', down='#ef5350', edge='inherit', wick='inherit', volume='in')
+            s = mpf.make_mpf_style(marketcolors=mc, gridstyle=':', y_on_right=True)
+
+            # ピクセルをインチに変換 (100 dpiと仮定)
+            dpi = 100
+            figsize = (width / dpi, height / dpi)
+
+            # チャート生成と保存
+            mpf.plot(
+                df,
+                type='candle',
+                volume=True,
+                title=title,
+                style=s,
+                figsize=figsize,
+                savefig=dict(fname=output_path, dpi=dpi, bbox_inches='tight')
+            )
 
             print(f"Chart generated successfully: {output_path}")
             return output_path
@@ -221,57 +184,43 @@ class ChartGenerator:
             return None
 
         try:
+            output_path = os.path.join(self.output_dir, f'{ticker}_{months}m_simple.png')
+
             # 終値の変化率を計算
-            price_change = ((df['close'].iloc[-1] - df['close'].iloc[0]) / df['close'].iloc[0]) * 100
+            price_change = ((df['Close'].iloc[-1] - df['Close'].iloc[0]) / df['Close'].iloc[0]) * 100
             color = '#26a69a' if price_change >= 0 else '#ef5350'
+            fill_color = color  # alpha is handled by matplotlib
 
-            # 線チャートを作成
-            fig = go.Figure()
+            # プロット設定
+            dpi = 100
+            figsize = (width / dpi, height / dpi)
 
-            fig.add_trace(
-                go.Scatter(
-                    x=df['date'],
-                    y=df['close'],
-                    mode='lines',
-                    name='Close Price',
-                    line=dict(color=color, width=2),
-                    fill='tozeroy',
-                    fillcolor=f'rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.1)'
-                )
-            )
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
 
-            # レイアウト設定
+            # 線グラフ
+            ax.plot(df.index, df['Close'], color=color, linewidth=2)
+
+            # 下部を塗りつぶし
+            ax.fill_between(df.index, df['Close'], df['Close'].min() * 0.99, color=fill_color, alpha=0.1)
+
+            # タイトル
             title_text = f'{ticker}'
             if company_name:
                 title_text = f'{company_name} ({ticker})'
-            title_text += f' | {months}ヶ月 | {price_change:+.2f}%'
+            title_text += f' | {months} months | {price_change:+.2f}%'
 
-            fig.update_layout(
-                title=dict(
-                    text=title_text,
-                    font=dict(size=18, family='Arial, sans-serif', color='#333')
-                ),
-                width=width,
-                height=height,
-                template='plotly_white',
-                hovermode='x unified',
-                font=dict(family='Arial, sans-serif', size=11),
-                margin=dict(l=60, r=30, t=60, b=40),
-                xaxis=dict(
-                    gridcolor='lightgray',
-                    showgrid=True
-                ),
-                yaxis=dict(
-                    title='Price ($)',
-                    gridcolor='lightgray',
-                    showgrid=True
-                ),
-                showlegend=False
-            )
+            ax.set_title(title_text, fontsize=18, color='#333333')
 
-            # 画像として保存
-            output_path = os.path.join(self.output_dir, f'{ticker}_{months}m_simple.png')
-            fig.write_image(output_path)
+            # 軸の設定
+            ax.set_ylabel('Price ($)', fontsize=12)
+            ax.grid(True, linestyle=':', alpha=0.6)
+
+            # マージン調整
+            plt.tight_layout()
+
+            # 保存
+            plt.savefig(output_path, dpi=dpi)
+            plt.close(fig)
 
             print(f"Simple chart generated successfully: {output_path}")
             return output_path
