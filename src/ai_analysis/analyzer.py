@@ -29,19 +29,35 @@ class GeminiClient:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-pro')
 
-    def generate_content(self, prompt: str) -> str:
+    def generate_content(self, prompt: str, use_search: bool = False) -> str:
         """
         コンテンツ生成
 
         Args:
             prompt: プロンプト
+            use_search: Web検索を使用するか
 
         Returns:
             生成されたテキスト
         """
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            # Web検索を使う場合はgrounding設定を追加
+            if use_search:
+                # Note: Google Search Groundingは一部のAPIキーでのみ利用可能
+                # 利用できない場合は通常の生成にフォールバック
+                try:
+                    response = self.model.generate_content(
+                        prompt,
+                        tools=[{"google_search_retrieval": {}}]
+                    )
+                    return response.text
+                except Exception as search_error:
+                    print(f"Web検索機能が利用できません。通常の生成を使用します: {search_error}")
+                    response = self.model.generate_content(prompt)
+                    return response.text
+            else:
+                response = self.model.generate_content(prompt)
+                return response.text
         except Exception as e:
             print(f"Gemini API error: {e}")
             return ""
@@ -83,89 +99,144 @@ class ScreenerAnalyzer:
         recommended_stocks = {}
         for screener in json_data.get("screeners", []):
             screener_name = screener["name"]
-            new_tickers = [t for t in screener.get("tickers", []) if t.get("is_new", False)]
+            all_tickers_in_screener = screener.get("tickers", [])
+            new_tickers = [t for t in all_tickers_in_screener if t.get("is_new", False)]
 
             if new_tickers:
                 top_stock = self.select_top_stock_per_screener(
                     screener_name=screener_name,
                     new_tickers=new_tickers,
+                    all_tickers=all_tickers_in_screener,
                     screener_info=screener
                 )
                 recommended_stocks[screener_name] = top_stock
 
-        # Industry Group傾向を分析
-        all_tickers = []
-        for screener in json_data.get("screeners", []):
-            all_tickers.extend(screener.get("tickers", []))
-
-        industry_trends = self.analyze_industry_trends(all_tickers)
-
         return {
             "date": json_data.get("date", ""),
-            "recommended_stocks": recommended_stocks,
-            "industry_trends": industry_trends
+            "recommended_stocks": recommended_stocks
         }
 
     def select_top_stock_per_screener(
         self,
         screener_name: str,
         new_tickers: List[dict],
+        all_tickers: List[dict],
         screener_info: dict
     ) -> dict:
         """
-        各スクリーナーでトップ銘柄を選定
+        各スクリーナーでトップ銘柄を選定し、その他の銘柄とトレンドも取得
 
         Args:
             screener_name: スクリーナー名
             new_tickers: 新規銘柄リスト
+            all_tickers: スクリーナーの全銘柄リスト
             screener_info: スクリーナー情報
 
         Returns:
-            {"ticker": "AAPL", "reason": "理由..."}
+            {
+                "ticker": "AAPL",
+                "reason": "Web検索で調査した上昇理由",
+                "other_tickers": ["NVDA", "AVGO", "META", ...],
+                "trend": "トレンド説明"
+            }
         """
-        # プロンプトを構築
-        prompt = f"""あなたは米国株式市場の専門アナリストです。
+        if not new_tickers:
+            return {
+                "ticker": "",
+                "reason": "新規銘柄がありません",
+                "other_tickers": [],
+                "trend": ""
+            }
 
-以下のスクリーナーで新規に抽出された銘柄の中から、最も有望な銘柄を1つ選び、理由を簡潔に述べてください。
+        # ステップ1: トップ銘柄を選定
+        selection_prompt = f"""あなたは米国株式市場の専門アナリストです。
+
+以下のスクリーナーで新規に抽出された銘柄の中から、最も有望な銘柄を1つ選んでください。
 
 【スクリーナー情報】
 名称: {screener_name}
-説明: {screener_info.get('description', '')}
-条件: {json.dumps(screener_info.get('criteria', {}), ensure_ascii=False, indent=2)}
+条件: {json.dumps(screener_info.get('criteria', {}), ensure_ascii=False)}
 
 【新規抽出銘柄】
-{json.dumps(new_tickers, ensure_ascii=False, indent=2)}
+{json.dumps([{"ticker": t["ticker"], "price": t.get("price"), "sector": t.get("sector")} for t in new_tickers[:20]], ensure_ascii=False)}
 
 出力形式（JSON）:
 {{
-  "ticker": "銘柄コード",
-  "reason": "選定理由（100文字以内）"
+  "ticker": "銘柄コード"
 }}
 """
 
         try:
-            response_text = self.gemini_client.generate_content(prompt)
-
-            # JSONを抽出
-            # レスポンステキストから```json と ``` を除去
-            json_text = response_text
-            if "```json" in json_text:
-                json_text = json_text.split("```json")[1].split("```")[0]
-            elif "```" in json_text:
-                json_text = json_text.split("```")[1].split("```")[0]
-
-            result = json.loads(json_text.strip())
-            return result
-
+            response_text = self.gemini_client.generate_content(selection_prompt)
+            json_text = self._extract_json(response_text)
+            selected = json.loads(json_text.strip())
+            top_ticker = selected.get("ticker", new_tickers[0]["ticker"] if new_tickers else "")
         except Exception as e:
-            print(f"Error selecting top stock for {screener_name}: {e}")
-            # デフォルト: 最初の銘柄を選択
-            if new_tickers:
-                return {
-                    "ticker": new_tickers[0]["ticker"],
-                    "reason": "AI分析エラーのため、リストの最初の銘柄を選択しました。"
-                }
-            return {"ticker": "", "reason": "新規銘柄がありません"}
+            print(f"Error selecting ticker: {e}")
+            top_ticker = new_tickers[0]["ticker"] if new_tickers else ""
+
+        # ステップ2: Web検索で銘柄の上昇理由を調査
+        reason_prompt = f"""${top_ticker}の株価が最近上昇している理由を、最新のニュースや決算情報から30文字以内で簡潔に説明してください。
+
+例: 「直近の決算で黒字化」「AI事業の好調な業績」「新製品発表で期待」
+"""
+
+        try:
+            reason = self.gemini_client.generate_content(reason_prompt, use_search=True)
+            reason = reason.strip().replace('\n', '')[:30]
+        except Exception as e:
+            print(f"Error getting reason: {e}")
+            reason = "市場で注目されている銘柄"
+
+        # ステップ3: その他の銘柄リストを作成（最大10銘柄）
+        other_tickers_list = [t["ticker"] for t in all_tickers if t["ticker"] != top_ticker]
+
+        if len(other_tickers_list) > 10:
+            # Geminiに10個選定してもらう
+            other_selection_prompt = f"""以下の銘柄リストから、最も有望な10銘柄を選んでください。
+
+銘柄リスト:
+{json.dumps(other_tickers_list[:30], ensure_ascii=False)}
+
+出力形式（JSON）:
+{{
+  "tickers": ["NVDA", "AVGO", "META", ...]
+}}
+"""
+            try:
+                response_text = self.gemini_client.generate_content(other_selection_prompt)
+                json_text = self._extract_json(response_text)
+                selected_others = json.loads(json_text.strip())
+                other_tickers_list = selected_others.get("tickers", other_tickers_list[:10])
+            except Exception as e:
+                print(f"Error selecting other tickers: {e}")
+                other_tickers_list = other_tickers_list[:10]
+        else:
+            other_tickers_list = other_tickers_list[:10]
+
+        # ステップ4: トレンド分析（Industry Group）
+        industry_dist = {}
+        for ticker in all_tickers:
+            industry = ticker.get("industry_group", "Unknown")
+            industry_dist[industry] = industry_dist.get(industry, 0) + 1
+
+        top_industry = max(industry_dist.items(), key=lambda x: x[1])[0] if industry_dist else "不明"
+        trend = f"{top_industry}が強い"[:30]
+
+        return {
+            "ticker": top_ticker,
+            "reason": reason,
+            "other_tickers": other_tickers_list,
+            "trend": trend
+        }
+
+    def _extract_json(self, text: str) -> str:
+        """レスポンステキストからJSONを抽出"""
+        if "```json" in text:
+            return text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            return text.split("```")[1].split("```")[0]
+        return text
 
     def analyze_industry_trends(self, all_tickers: List[dict]) -> str:
         """

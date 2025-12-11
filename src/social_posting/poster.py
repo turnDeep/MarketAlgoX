@@ -125,6 +125,17 @@ class TweetFormatter:
         """
         分析結果を投稿用に整形（各スクリーナーごとに独立したツイート）
 
+        フォーマット:
+        【スクリーナー名】
+        💡 $TICKER
+        理由
+
+        その他
+        $NVDA $AVGO $META
+
+        傾向
+        AI需要によるIndustry Groupが強い
+
         Args:
             analysis_result: AI分析結果
             date: 日付 (YYYY-MM-DD形式)
@@ -140,30 +151,63 @@ class TweetFormatter:
             for screener_name, stock_info in recommended_stocks.items():
                 ticker = stock_info.get("ticker", "")
                 reason = stock_info.get("reason", "")
+                other_tickers = stock_info.get("other_tickers", [])
+                trend = stock_info.get("trend", "")
 
                 # 基本フォーマット
                 tweet = f"【{screener_name}】\n"
                 tweet += f"💡 ${ticker}\n"
                 tweet += f"{reason}\n"
-                tweet += f"#{date.replace('-', '')} #米国株"
+                tweet += f"\n"
 
-                # 140字を超える場合は理由を短縮
+                # その他の銘柄（最大10個）
+                if other_tickers:
+                    tweet += f"その他\n"
+                    other_str = " ".join([f"${t}" for t in other_tickers[:10]])
+                    tweet += f"{other_str}\n"
+                    tweet += f"\n"
+
+                # 傾向
+                if trend:
+                    tweet += f"傾向\n"
+                    tweet += f"{trend}"
+
+                # 140字を超える場合は調整
                 if len(tweet) > TweetFormatter.MAX_TWEET_LENGTH_JP:
-                    # 理由部分を計算
-                    base_len = len(f"【{screener_name}】\n💡 ${ticker}\n\n#{date.replace('-', '')} #米国株")
-                    max_reason_len = TweetFormatter.MAX_TWEET_LENGTH_JP - base_len - 5  # "..." を考慮
+                    # 優先度: スクリーナー名 > 銘柄 > 理由 > その他 > 傾向
+                    # その他の銘柄数を減らす
+                    for max_other in [7, 5, 3, 1, 0]:
+                        tweet = f"【{screener_name}】\n"
+                        tweet += f"💡 ${ticker}\n"
+                        tweet += f"{reason}\n"
+                        tweet += f"\n"
 
-                    if max_reason_len > 0:
-                        reason_short = reason[:max_reason_len] + "..."
-                        tweet = f"【{screener_name}】\n"
-                        tweet += f"💡 ${ticker}\n"
-                        tweet += f"{reason_short}\n"
-                        tweet += f"#{date.replace('-', '')} #米国株"
-                    else:
-                        # 理由が入らない場合は省略
-                        tweet = f"【{screener_name}】\n"
-                        tweet += f"💡 ${ticker}\n"
-                        tweet += f"#{date.replace('-', '')} #米国株"
+                        if max_other > 0 and other_tickers:
+                            tweet += f"その他\n"
+                            other_str = " ".join([f"${t}" for t in other_tickers[:max_other]])
+                            tweet += f"{other_str}\n"
+                            tweet += f"\n"
+
+                        if trend:
+                            tweet += f"傾向\n"
+                            tweet += f"{trend}"
+
+                        if len(tweet) <= TweetFormatter.MAX_TWEET_LENGTH_JP:
+                            break
+
+                    # まだ超える場合は理由を短縮
+                    if len(tweet) > TweetFormatter.MAX_TWEET_LENGTH_JP:
+                        base_len = len(f"【{screener_name}】\n💡 ${ticker}\n\n\n傾向\n{trend}")
+                        max_reason_len = TweetFormatter.MAX_TWEET_LENGTH_JP - base_len - 5
+
+                        if max_reason_len > 0:
+                            reason_short = reason[:max_reason_len] + "..."
+                            tweet = f"【{screener_name}】\n"
+                            tweet += f"💡 ${ticker}\n"
+                            tweet += f"{reason_short}\n"
+                            tweet += f"\n"
+                            tweet += f"傾向\n"
+                            tweet += f"{trend}"
 
                 tweets.append(tweet)
 
@@ -290,27 +334,39 @@ def main():
         "recommended_stocks": {
             "短期中期長期の最強銘柄": {
                 "ticker": "AAPL",
-                "reason": "1ヶ月、3ヶ月、6ヶ月すべての期間で上位3%の強力なモメンタムを示しています。"
+                "reason": "直近の決算で黒字化したことで上昇",
+                "other_tickers": ["NVDA", "AVGO", "META", "GOOGL", "MSFT"],
+                "trend": "AI需要によるTechnology業界が強い"
             },
             "爆発的EPS成長銘柄": {
                 "ticker": "NVDA",
-                "reason": "直近四半期のEPS成長率が150%を超え、AI需要の恩恵を受けています。"
+                "reason": "AI事業の好調な業績で期待上昇",
+                "other_tickers": ["AMD", "AVGO", "TSM"],
+                "trend": "Semiconductors業界が好調"
             },
             "出来高急増上昇銘柄": {
                 "ticker": "TSLA",
-                "reason": "出来高が平常時の150%増加で価格も上昇中。機関投資家の買いが継続しています。"
+                "reason": "新製品発表で期待が高まる",
+                "other_tickers": ["RIVN", "LCID", "NIO"],
+                "trend": "Electric Vehicles業界に注目"
             },
             "相対強度トップ2%銘柄": {
                 "ticker": "MSFT",
-                "reason": "RS Rating 99で移動平均が理想的な上昇トレンド。クラウド事業が好調です。"
+                "reason": "クラウド事業の売上が予想超え",
+                "other_tickers": ["GOOGL", "AMZN", "CRM"],
+                "trend": "Software業界が堅調"
             },
             "急騰直後銘柄": {
                 "ticker": "META",
-                "reason": "前日4.5%上昇で出来高も急増。広告事業の回復期待が高まっています。"
+                "reason": "広告収入の回復で株価急騰",
+                "other_tickers": ["SNAP", "PINS", "SPOT"],
+                "trend": "Social Media業界が回復"
             },
             "健全チャート銘柄": {
                 "ticker": "GOOGL",
-                "reason": "全移動平均が綺麗な上昇トレンド。RS Lineも新高値で技術的に優位です。"
+                "reason": "AI統合で検索事業が強化",
+                "other_tickers": ["MSFT", "META", "AMZN"],
+                "trend": "Internet Services業界が好調"
             }
         }
     }
