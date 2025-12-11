@@ -1,7 +1,16 @@
+version: '3.8'
+
 services:
   app:
     build: .
+    container_name: marketalgox
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
     volumes:
-      - .:/app
-    # Keep the container running in the background
-    tty: true
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./.env:/app/.env
+    restart: unless-stopped

@@ -1,0 +1,10 @@
+# MarketAlgoX Daily Workflow
+# 火曜から土曜の朝6時（JST）に実行
+# 米国市場の営業日（月〜金）の翌日にデータ取得
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+TZ=Asia/Tokyo
+
+# 毎日朝6時、火曜から土曜
+0 6 * * 2-6 root cd /app && . /app/.env && /usr/local/bin/python /app/scripts/daily_workflow.py >> /app/logs/cron.log 2>> /app/logs/error.log
