@@ -47,22 +47,53 @@ class XClient:
             access_token_secret=access_token_secret
         )
 
-    def post_tweet(self, text: str) -> dict:
+    def upload_media(self, media_path: str) -> str:
+        """
+        メディアファイルをアップロード
+
+        Args:
+            media_path: メディアファイルのパス
+
+        Returns:
+            media_id（アップロード失敗時はNone）
+        """
+        try:
+            if not os.path.exists(media_path):
+                print(f"Media file not found: {media_path}")
+                return None
+
+            # API v1.1を使用してメディアをアップロード
+            media = self.api.media_upload(media_path)
+            print(f"Media uploaded successfully: {media.media_id}")
+            return str(media.media_id)
+
+        except Exception as e:
+            print(f"Error uploading media: {e}")
+            return None
+
+    def post_tweet(self, text: str, media_ids: List[str] = None) -> dict:
         """
         ツイートを投稿
 
         Args:
             text: ツイート本文
+            media_ids: 添付するメディアIDのリスト（最大4つ）
 
         Returns:
             投稿結果
         """
         try:
-            response = self.client.create_tweet(text=text)
+            # メディアIDがある場合は添付
+            kwargs = {"text": text}
+            if media_ids:
+                kwargs["media_ids"] = media_ids[:4]  # 最大4つまで
+
+            response = self.client.create_tweet(**kwargs)
             return {
                 "success": True,
                 "tweet_id": response.data['id'] if response.data else None,
-                "text": text
+                "text": text,
+                "media_count": len(media_ids) if media_ids else 0
             }
         except Exception as e:
             print(f"Error posting tweet: {e}")
@@ -274,13 +305,14 @@ class XPoster:
         AI分析結果を投稿（各スクリーナーごとに独立したツイート）
 
         Args:
-            analysis_result: AI分析結果
+            analysis_result: AI分析結果（チャートパスを含む）
 
         Returns:
             投稿結果のリスト
         """
         date = analysis_result.get("date", "")
         tweets = self.formatter.format_analysis_result(analysis_result, date)
+        recommended_stocks = analysis_result.get("recommended_stocks", {})
 
         print(f"\n=== X投稿開始 ({len(tweets)}ツイート - 各スクリーナーごとに独立投稿) ===")
         for i, tweet in enumerate(tweets, 1):
@@ -292,13 +324,34 @@ class XPoster:
         results = []
         import time
 
+        screener_names = list(recommended_stocks.keys())
+
         for i, tweet in enumerate(tweets, 1):
             print(f"\n投稿中 [{i}/{len(tweets)}]...")
-            result = self.client.post_tweet(tweet)
+
+            # チャート画像を添付（ある場合）
+            media_ids = []
+            if i <= len(screener_names):
+                screener_name = screener_names[i - 1]
+                chart_path = recommended_stocks[screener_name].get("chart_path")
+
+                if chart_path and os.path.exists(chart_path):
+                    print(f"Uploading chart: {chart_path}")
+                    media_id = self.client.upload_media(chart_path)
+                    if media_id:
+                        media_ids.append(media_id)
+                        print(f"✓ Chart uploaded: media_id={media_id}")
+                    else:
+                        print(f"✗ Chart upload failed")
+
+            # ツイート投稿
+            result = self.client.post_tweet(tweet, media_ids=media_ids if media_ids else None)
             results.append(result)
 
             if result.get("success"):
                 print(f"✓ 投稿成功")
+                if media_ids:
+                    print(f"  画像添付: {len(media_ids)}枚")
             else:
                 print(f"✗ 投稿失敗: {result.get('error', 'Unknown error')}")
 
