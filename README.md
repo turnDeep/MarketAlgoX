@@ -4,7 +4,7 @@
 
 ## 概要
 
-MarketAlgoXは、FinancialModelingPrep APIからデータを取得し、IBDスタイルのスクリーニングを実行し、Gemini 3 ProのAI分析を経てX (Twitter)に自動投稿するシステムです。
+MarketAlgoXは、FinancialModelingPrep APIからデータを取得し、IBDスタイルのスクリーニングを実行し、OpenAI GPT-4oのAI分析を経てX (Twitter)に自動投稿するシステムです。
 
 ### 主な機能
 
@@ -12,7 +12,7 @@ MarketAlgoXは、FinancialModelingPrep APIからデータを取得し、IBDス�
 - **レーティング計算**: RS Rating、EPS Rating、Composite Rating等のIBDレーティングを計算
 - **スクリーニング**: 6つのIBDスクリーナーで有望銘柄を抽出
 - **JSON出力**: 日次スクリーニング結果をJSON形式で保存
-- **AI分析**: Gemini 3 Proが各スクリーナーでオススメ銘柄を選定し、Industry Group傾向を分析
+- **AI分析**: OpenAI GPT-4oが各スクリーナーでオススメ銘柄を選定し、Industry Group傾向を分析
 - **X投稿**: 分析結果を自動的にX (Twitter)に投稿
 - **自動実行**: Cronで毎日朝6時（日本時間、火〜土曜）に自動実行
 
@@ -37,11 +37,12 @@ MarketAlgoXは、FinancialModelingPrep APIからデータを取得し、IBDス�
 3. Premium Plan ($29/月) 以上を契約（推奨: 750 req/min）
 4. API Keyを取得
 
-#### Gemini API
-1. https://ai.google.dev/ にアクセス
-2. Googleアカウントでログイン
-3. "Get API Key" をクリック
-4. API Keyを生成
+#### OpenAI API
+1. https://platform.openai.com/ にアクセス
+2. アカウントでログイン
+3. "API Keys" に移動
+4. "Create new secret key" をクリック
+5. API Keyをコピーして保存
 
 #### X (Twitter) API
 1. https://developer.twitter.com/ にアクセス
@@ -66,7 +67,8 @@ nano .env
 `.env`ファイルの例:
 ```bash
 FMP_API_KEY=your_actual_fmp_api_key
-GEMINI_API_KEY=your_actual_gemini_api_key
+OPENAI_API_KEY=your_actual_openai_api_key
+OPENAI_MODEL=gpt-4o
 X_API_KEY=your_actual_x_api_key
 X_API_SECRET=your_actual_x_api_secret
 X_ACCESS_TOKEN=your_actual_x_access_token
@@ -230,5 +232,5 @@ MIT License
 
 - [システム開発仕様書](SYSTEM_SPECIFICATION.md)
 - [FinancialModelingPrep API Docs](https://site.financialmodelingprep.com/developer/docs)
-- [Gemini API Docs](https://ai.google.dev/docs)
+- [OpenAI API Docs](https://platform.openai.com/docs)
 - [Twitter API v2 Docs](https://developer.twitter.com/en/docs/twitter-api)

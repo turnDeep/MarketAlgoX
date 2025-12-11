@@ -1,7 +1,7 @@
 """
 AI分析モジュール
 
-Gemini 3 ProのAPIを使用してスクリーニング結果を分析
+OpenAI APIを使用してスクリーニング結果を分析
 """
 
 import json
@@ -9,25 +9,26 @@ import os
 from typing import Dict, List
 
 try:
-    import google.generativeai as genai
+    from openai import OpenAI
 except ImportError:
-    print("Warning: google-generativeai not installed. Run: pip install google-generativeai")
-    genai = None
+    print("Warning: openai not installed. Run: pip install openai")
+    OpenAI = None
 
 
-class GeminiClient:
-    """Gemini 3 Pro APIクライアント"""
+class OpenAIClient:
+    """OpenAI APIクライアント"""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model: str = "gpt-4o"):
         """
         Args:
-            api_key: Gemini API Key
+            api_key: OpenAI API Key
+            model: 使用するモデル (例: gpt-4o, gpt-4-turbo)
         """
-        if not genai:
-            raise ImportError("google-generativeai is not installed")
+        if not OpenAI:
+            raise ImportError("openai is not installed")
 
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
 
     def generate_content(self, prompt: str, use_search: bool = False) -> str:
         """
@@ -35,43 +36,41 @@ class GeminiClient:
 
         Args:
             prompt: プロンプト
-            use_search: Web検索を使用するか
+            use_search: Web検索を使用するか（OpenAIではサポートされていないため無視）
 
         Returns:
             生成されたテキスト
         """
         try:
-            # Web検索を使う場合はgrounding設定を追加
+            # Web検索はOpenAIのネイティブ機能ではないため、
+            # プロンプトで最新情報を求めるよう指示
             if use_search:
-                # Note: Google Search Groundingは一部のAPIキーでのみ利用可能
-                # 利用できない場合は通常の生成にフォールバック
-                try:
-                    response = self.model.generate_content(
-                        prompt,
-                        tools=[{"google_search_retrieval": {}}]
-                    )
-                    return response.text
-                except Exception as search_error:
-                    print(f"Web検索機能が利用できません。通常の生成を使用します: {search_error}")
-                    response = self.model.generate_content(prompt)
-                    return response.text
-            else:
-                response = self.model.generate_content(prompt)
-                return response.text
+                prompt = f"{prompt}\n\n※最新の市場動向や決算情報を考慮して回答してください。"
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "あなたは米国株式市場の専門アナリストです。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7
+            )
+            return response.choices[0].message.content
         except Exception as e:
-            print(f"Gemini API error: {e}")
+            print(f"OpenAI API error: {e}")
             return ""
 
 
 class ScreenerAnalyzer:
     """スクリーニング結果分析"""
 
-    def __init__(self, gemini_api_key: str):
+    def __init__(self, openai_api_key: str, model: str = "gpt-4o"):
         """
         Args:
-            gemini_api_key: Gemini API Key
+            openai_api_key: OpenAI API Key
+            model: 使用するモデル
         """
-        self.gemini_client = GeminiClient(gemini_api_key)
+        self.openai_client = OpenAIClient(openai_api_key, model)
 
     def analyze_screening_results(self, json_file_path: str) -> dict:
         """
@@ -167,7 +166,7 @@ class ScreenerAnalyzer:
 """
 
         try:
-            response_text = self.gemini_client.generate_content(selection_prompt)
+            response_text = self.openai_client.generate_content(selection_prompt)
             json_text = self._extract_json(response_text)
             selected = json.loads(json_text.strip())
             top_ticker = selected.get("ticker", new_tickers[0]["ticker"] if new_tickers else "")
@@ -175,14 +174,14 @@ class ScreenerAnalyzer:
             print(f"Error selecting ticker: {e}")
             top_ticker = new_tickers[0]["ticker"] if new_tickers else ""
 
-        # ステップ2: Web検索で銘柄の上昇理由を調査
+        # ステップ2: 銘柄の上昇理由を調査
         reason_prompt = f"""${top_ticker}の株価が最近上昇している理由を、最新のニュースや決算情報から30文字以内で簡潔に説明してください。
 
 例: 「直近の決算で黒字化」「AI事業の好調な業績」「新製品発表で期待」
 """
 
         try:
-            reason = self.gemini_client.generate_content(reason_prompt, use_search=True)
+            reason = self.openai_client.generate_content(reason_prompt, use_search=True)
             reason = reason.strip().replace('\n', '')[:30]
         except Exception as e:
             print(f"Error getting reason: {e}")
@@ -192,7 +191,7 @@ class ScreenerAnalyzer:
         other_tickers_list = [t["ticker"] for t in all_tickers if t["ticker"] != top_ticker]
 
         if len(other_tickers_list) > 10:
-            # Geminiに10個選定してもらう
+            # AIに10個選定してもらう
             other_selection_prompt = f"""以下の銘柄リストから、最も有望な10銘柄を選んでください。
 
 銘柄リスト:
@@ -204,7 +203,7 @@ class ScreenerAnalyzer:
 }}
 """
             try:
-                response_text = self.gemini_client.generate_content(other_selection_prompt)
+                response_text = self.openai_client.generate_content(other_selection_prompt)
                 json_text = self._extract_json(response_text)
                 selected_others = json.loads(json_text.strip())
                 other_tickers_list = selected_others.get("tickers", other_tickers_list[:10])
@@ -272,7 +271,7 @@ class ScreenerAnalyzer:
 """
 
         try:
-            response_text = self.gemini_client.generate_content(prompt)
+            response_text = self.openai_client.generate_content(prompt)
             return response_text.strip()
 
         except Exception as e:
@@ -291,12 +290,14 @@ def main():
 
     load_dotenv()
 
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    if not GEMINI_API_KEY or GEMINI_API_KEY == 'your_gemini_api_key_here':
-        print("エラー: GEMINI_API_KEYが設定されていません")
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o')
+
+    if not OPENAI_API_KEY or OPENAI_API_KEY == 'your_openai_api_key_here':
+        print("エラー: OPENAI_API_KEYが設定されていません")
         return
 
-    analyzer = ScreenerAnalyzer(GEMINI_API_KEY)
+    analyzer = ScreenerAnalyzer(OPENAI_API_KEY, OPENAI_MODEL)
 
     # テスト用のJSONファイルパス
     json_file = "./data/screener_results/20251211.json"

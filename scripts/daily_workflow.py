@@ -94,7 +94,8 @@ def main():
     load_dotenv()
 
     FMP_API_KEY = os.getenv('FMP_API_KEY')
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o')
     X_API_KEY = os.getenv('X_API_KEY')
     X_API_SECRET = os.getenv('X_API_SECRET')
     X_ACCESS_TOKEN = os.getenv('X_ACCESS_TOKEN')
@@ -147,9 +148,9 @@ def main():
         logger.info(f"JSON出力完了: {json_file}")
 
         # ステップ5: AI分析
-        if GEMINI_API_KEY and GEMINI_API_KEY != 'your_gemini_api_key_here':
+        if OPENAI_API_KEY and OPENAI_API_KEY != 'your_openai_api_key_here':
             logger.info("\n[5/6] AI分析フェーズ開始")
-            analyzer = ScreenerAnalyzer(GEMINI_API_KEY)
+            analyzer = ScreenerAnalyzer(OPENAI_API_KEY, OPENAI_MODEL)
             analysis = analyzer.analyze_screening_results(json_file)
             logger.info("AI分析完了")
 
@@ -164,7 +165,7 @@ def main():
             else:
                 logger.warning("X API認証情報が設定されていないため、投稿をスキップします")
         else:
-            logger.warning("GEMINI_API_KEYが設定されていないため、AI分析と投稿をスキップします")
+            logger.warning("OPENAI_API_KEYが設定されていないため、AI分析と投稿をスキップします")
 
         logger.info("\n" + "=" * 80)
         logger.info("MarketAlgoX Daily Workflow 正常終了")
