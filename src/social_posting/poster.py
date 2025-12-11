@@ -116,77 +116,74 @@ class XClient:
 class TweetFormatter:
     """投稿テキスト整形"""
 
-    MAX_TWEET_LENGTH = 280
+    # 日本語は140文字、英語は280文字
+    MAX_TWEET_LENGTH_JP = 140
+    MAX_TWEET_LENGTH_EN = 280
 
     @staticmethod
     def format_analysis_result(analysis_result: dict, date: str) -> List[str]:
         """
-        分析結果を投稿用に整形
+        分析結果を投稿用に整形（各スクリーナーごとに独立したツイート）
 
         Args:
             analysis_result: AI分析結果
             date: 日付 (YYYY-MM-DD形式)
 
         Returns:
-            投稿テキストのリスト（スレッド用）
+            投稿テキストのリスト（各スクリーナーごとに1ツイート）
         """
         tweets = []
 
-        # 1. ヘッダー
-        header = f"📊 米国株スクリーニング分析 ({date})\n\n"
-        header += "本日の注目銘柄とIndustry Group傾向をAIが分析しました。\n"
-        header += "#米国株 #株式投資"
-        tweets.append(header)
-
-        # 2. オススメ銘柄
+        # 各スクリーナーごとに独立したツイートを作成
         recommended_stocks = analysis_result.get("recommended_stocks", {})
         if recommended_stocks:
             for screener_name, stock_info in recommended_stocks.items():
                 ticker = stock_info.get("ticker", "")
                 reason = stock_info.get("reason", "")
 
+                # 基本フォーマット
                 tweet = f"【{screener_name}】\n"
-                tweet += f"💡 注目銘柄: ${ticker}\n"
-                tweet += f"理由: {reason}"
+                tweet += f"💡 ${ticker}\n"
+                tweet += f"{reason}\n"
+                tweet += f"#{date.replace('-', '')} #米国株"
 
-                # 280字を超える場合は分割
-                if len(tweet) > TweetFormatter.MAX_TWEET_LENGTH:
-                    # 理由を短縮
-                    max_reason_len = TweetFormatter.MAX_TWEET_LENGTH - len(tweet) + len(reason) - 10
-                    reason = reason[:max_reason_len] + "..."
-                    tweet = f"【{screener_name}】\n"
-                    tweet += f"💡 注目銘柄: ${ticker}\n"
-                    tweet += f"理由: {reason}"
+                # 140字を超える場合は理由を短縮
+                if len(tweet) > TweetFormatter.MAX_TWEET_LENGTH_JP:
+                    # 理由部分を計算
+                    base_len = len(f"【{screener_name}】\n💡 ${ticker}\n\n#{date.replace('-', '')} #米国株")
+                    max_reason_len = TweetFormatter.MAX_TWEET_LENGTH_JP - base_len - 5  # "..." を考慮
+
+                    if max_reason_len > 0:
+                        reason_short = reason[:max_reason_len] + "..."
+                        tweet = f"【{screener_name}】\n"
+                        tweet += f"💡 ${ticker}\n"
+                        tweet += f"{reason_short}\n"
+                        tweet += f"#{date.replace('-', '')} #米国株"
+                    else:
+                        # 理由が入らない場合は省略
+                        tweet = f"【{screener_name}】\n"
+                        tweet += f"💡 ${ticker}\n"
+                        tweet += f"#{date.replace('-', '')} #米国株"
 
                 tweets.append(tweet)
-
-        # 3. Industry Group傾向
-        industry_trends = analysis_result.get("industry_trends", "")
-        if industry_trends:
-            tweet = f"📈 Industry Group傾向\n\n{industry_trends}"
-
-            # 280字を超える場合は分割
-            if len(tweet) > TweetFormatter.MAX_TWEET_LENGTH:
-                max_trend_len = TweetFormatter.MAX_TWEET_LENGTH - len("📈 Industry Group傾向\n\n") - 10
-                industry_trends_short = industry_trends[:max_trend_len] + "..."
-                tweet = f"📈 Industry Group傾向\n\n{industry_trends_short}"
-
-            tweets.append(tweet)
 
         return tweets
 
     @staticmethod
-    def split_long_text(text: str, max_length: int = MAX_TWEET_LENGTH) -> List[str]:
+    def split_long_text(text: str, max_length: int = None) -> List[str]:
         """
         長文を指定文字数以内に分割
 
         Args:
             text: 分割するテキスト
-            max_length: 最大文字数
+            max_length: 最大文字数（デフォルト: 140）
 
         Returns:
             分割されたテキストのリスト
         """
+        if max_length is None:
+            max_length = TweetFormatter.MAX_TWEET_LENGTH_JP
+
         if len(text) <= max_length:
             return [text]
 
@@ -230,7 +227,7 @@ class XPoster:
 
     def post_analysis_result(self, analysis_result: dict) -> List[dict]:
         """
-        AI分析結果を投稿
+        AI分析結果を投稿（各スクリーナーごとに独立したツイート）
 
         Args:
             analysis_result: AI分析結果
@@ -241,14 +238,29 @@ class XPoster:
         date = analysis_result.get("date", "")
         tweets = self.formatter.format_analysis_result(analysis_result, date)
 
-        print(f"\n=== X投稿開始 ({len(tweets)}ツイート) ===")
+        print(f"\n=== X投稿開始 ({len(tweets)}ツイート - 各スクリーナーごとに独立投稿) ===")
         for i, tweet in enumerate(tweets, 1):
             print(f"\n[{i}/{len(tweets)}]")
             print(tweet)
             print(f"文字数: {len(tweet)}")
 
-        # スレッドとして投稿
-        results = self.client.post_thread(tweets)
+        # 各ツイートを独立して投稿（スレッドではない）
+        results = []
+        import time
+
+        for i, tweet in enumerate(tweets, 1):
+            print(f"\n投稿中 [{i}/{len(tweets)}]...")
+            result = self.client.post_tweet(tweet)
+            results.append(result)
+
+            if result.get("success"):
+                print(f"✓ 投稿成功")
+            else:
+                print(f"✗ 投稿失敗: {result.get('error', 'Unknown error')}")
+
+            # レート制限対策: 各投稿の間に2秒待機
+            if i < len(tweets):
+                time.sleep(2)
 
         print("\n=== X投稿完了 ===")
         success_count = sum(1 for r in results if r.get("success"))
@@ -283,9 +295,24 @@ def main():
             "爆発的EPS成長銘柄": {
                 "ticker": "NVDA",
                 "reason": "直近四半期のEPS成長率が150%を超え、AI需要の恩恵を受けています。"
+            },
+            "出来高急増上昇銘柄": {
+                "ticker": "TSLA",
+                "reason": "出来高が平常時の150%増加で価格も上昇中。機関投資家の買いが継続しています。"
+            },
+            "相対強度トップ2%銘柄": {
+                "ticker": "MSFT",
+                "reason": "RS Rating 99で移動平均が理想的な上昇トレンド。クラウド事業が好調です。"
+            },
+            "急騰直後銘柄": {
+                "ticker": "META",
+                "reason": "前日4.5%上昇で出来高も急増。広告事業の回復期待が高まっています。"
+            },
+            "健全チャート銘柄": {
+                "ticker": "GOOGL",
+                "reason": "全移動平均が綺麗な上昇トレンド。RS Lineも新高値で技術的に優位です。"
             }
-        },
-        "industry_trends": "Technology業界が全体の40%を占め、特にSemiconductorsとSoftware - Infrastructureが目立ちます。AI関連銘柄への注目が集まっています。"
+        }
     }
 
     poster = XPoster(X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET)
