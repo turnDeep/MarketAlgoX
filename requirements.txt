@@ -22,3 +22,6 @@ curl-cffi>=0.13.0
 
 # Environment Variables
 python-dotenv==0.21.0
+
+# Chart Generation
+kaleido>=0.2.1

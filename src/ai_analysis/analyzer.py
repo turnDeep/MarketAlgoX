@@ -6,13 +6,25 @@ OpenAI APIを使用してスクリーニング結果を分析
 
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
     from openai import OpenAI
 except ImportError:
     print("Warning: openai not installed. Run: pip install openai")
     OpenAI = None
+
+# チャート生成モジュールのインポート
+try:
+    from ..chart_generation import ChartGenerator
+except ImportError:
+    try:
+        import sys
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+        from chart_generation import ChartGenerator
+    except ImportError:
+        print("Warning: ChartGenerator not found")
+        ChartGenerator = None
 
 
 class OpenAIClient:
@@ -64,13 +76,18 @@ class OpenAIClient:
 class ScreenerAnalyzer:
     """スクリーニング結果分析"""
 
-    def __init__(self, openai_api_key: str, model: str = "gpt-4o"):
+    def __init__(self, openai_api_key: str, model: str = "gpt-4o", generate_charts: bool = True):
         """
         Args:
             openai_api_key: OpenAI API Key
             model: 使用するモデル
+            generate_charts: チャート生成を有効にするか
         """
         self.openai_client = OpenAIClient(openai_api_key, model)
+        self.generate_charts = generate_charts and ChartGenerator is not None
+
+        if self.generate_charts:
+            self.chart_generator = ChartGenerator()
 
     def analyze_screening_results(self, json_file_path: str) -> dict:
         """
@@ -84,7 +101,8 @@ class ScreenerAnalyzer:
                 "recommended_stocks": {
                     "スクリーナー名": {
                         "ticker": "AAPL",
-                        "reason": "理由..."
+                        "reason": "理由...",
+                        "chart_path": "path/to/chart.png"
                     }
                 },
                 "industry_trends": "分析結果..."
@@ -109,6 +127,10 @@ class ScreenerAnalyzer:
                     screener_info=screener
                 )
                 recommended_stocks[screener_name] = top_stock
+
+        # チャート生成後、古いチャートをクリーンアップ
+        if self.generate_charts:
+            self.chart_generator.cleanup_old_charts(days=7)
 
         return {
             "date": json_data.get("date", ""),
@@ -222,11 +244,38 @@ class ScreenerAnalyzer:
         top_industry = max(industry_dist.items(), key=lambda x: x[1])[0] if industry_dist else "不明"
         trend = f"{top_industry}が強い"[:30]
 
+        # ステップ5: チャート生成（トップ銘柄のみ）
+        chart_path = None
+        if self.generate_charts and top_ticker:
+            # 会社名を取得
+            company_name = ""
+            for t in all_tickers:
+                if t["ticker"] == top_ticker:
+                    company_name = t.get("company_name", "")
+                    break
+
+            print(f"Generating chart for {top_ticker} ({company_name})...")
+            try:
+                # ツイート用のシンプルなチャートを生成
+                chart_path = self.chart_generator.generate_simple_line_chart(
+                    ticker=top_ticker,
+                    company_name=company_name,
+                    months=3
+                )
+                if chart_path:
+                    print(f"✓ Chart generated: {chart_path}")
+                else:
+                    print(f"✗ Chart generation failed for {top_ticker}")
+            except Exception as e:
+                print(f"Error generating chart for {top_ticker}: {e}")
+                chart_path = None
+
         return {
             "ticker": top_ticker,
             "reason": reason,
             "other_tickers": other_tickers_list,
-            "trend": trend
+            "trend": trend,
+            "chart_path": chart_path
         }
 
     def _extract_json(self, text: str) -> str:
