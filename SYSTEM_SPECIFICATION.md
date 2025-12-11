@@ -1,7 +1,7 @@
 # MarketAlgoX システム開発仕様書
 
 ## バージョン情報
-- **バージョン**: 1.1.0
+- **バージョン**: 1.2.0
 - **作成日**: 2025-12-11
 - **最終更新日**: 2025-12-11
 
@@ -29,7 +29,7 @@
 
 ## 1. システム概要
 
-MarketAlgoXは、米国株式市場のスクリーニング、AI分析、自動投稿を行う統合システムです。定期的に株価データを収集し、IBD（Investor's Business Daily）スタイルのスクリーニングを実行し、Gemini 3 ProのAI分析を経てX（旧Twitter）に投稿します。
+MarketAlgoXは、米国株式市場のスクリーニング、AI分析、自動投稿を行う統合システムです。定期的に株価データを収集し、IBD（Investor's Business Daily）スタイルのスクリーニングを実行し、OpenAI GPT-4oのAI分析を経てX（旧Twitter）に投稿します。
 
 ### 1.1 システムの目的
 - 米国株式市場の日次分析を自動化
@@ -51,7 +51,7 @@ MarketAlgoXは、米国株式市場のスクリーニング、AI分析、自動�
 2. **データ収集**: FinancialModelingPrepのAPIを使用して米国株の必要なデータを取得
 3. **スクリーニング**: 6つのIBDスクリーナーで銘柄をフィルタリング
 4. **データ保存**: スクリーニング結果をJSON形式で日次保存（例：20251211.json）
-5. **AI分析**: Gemini 3 ProのAPIを使用して分析
+5. **AI分析**: OpenAI GPT-4oのAPIを使用して分析
    - 各スクリーナーで新規に抽出された銘柄から、各スクリーナーでオススメ銘柄を1つ選定し理由を記述
    - 全スクリーナーの結果から、Industry Groupの傾向を分析
 6. **自動投稿**: X（Twitter）APIを使用してBotとして投稿
@@ -81,11 +81,11 @@ MarketAlgoXは、米国株式市場のスクリーニング、AI分析、自動�
 - **FR-SC-07**: スクリーニング結果をJSON形式で保存
 
 ### 3.3 AI分析機能
-- **FR-AI-01**: Gemini 3 Pro APIに接続
+- **FR-AI-01**: OpenAI GPT-4o APIに接続
 - **FR-AI-02**: 各スクリーナーで新規抽出された銘柄を分析
 - **FR-AI-03**: 各スクリーナーでオススメ銘柄を1つ選定し、理由を記述
 - **FR-AI-04**: Industry Groupの傾向を分析
-- **FR-AI-05**: スクリーナーの意味をJSONに含めてGeminiに提供
+- **FR-AI-05**: スクリーナーの意味をJSONに含めてAIに提供
 
 ### 3.4 投稿機能
 - **FR-PO-01**: X（Twitter）APIに接続
@@ -118,7 +118,9 @@ curl_cffi>=0.5.0
 # Google API
 gspread>=6.0.0
 google-auth>=2.0.0
-google-generativeai>=0.3.0  # Gemini API
+
+# OpenAI API
+openai>=1.0.0
 
 # X (Twitter) API
 tweepy>=4.14.0
@@ -132,7 +134,7 @@ sqlite3 (標準ライブラリ)
 
 ### 4.3 外部API
 - **FinancialModelingPrep API**: 株価・財務データ取得
-- **Gemini 3 Pro API**: AI分析
+- **OpenAI GPT-4o API**: AI分析
 - **X (Twitter) API v2**: 投稿機能
 
 ### 4.4 インフラストラクチャ
@@ -204,7 +206,7 @@ sqlite3 (標準ライブラリ)
 
 External Services:
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│  FMP API         │  │  Gemini 3 Pro    │  │  X (Twitter)     │
+│  FMP API         │  │  OpenAI GPT-4o   │  │  X (Twitter)     │
 │  (データ取得)     │  │  (AI分析)        │  │  (投稿)          │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 ```
@@ -256,8 +258,7 @@ MarketAlgoX/
 │   │
 │   ├── ai_analysis/                # AI分析モジュール
 │   │   ├── __init__.py
-│   │   ├── gemini_client.py        # Gemini APIクライアント
-│   │   └── analyzer.py             # 分析ロジック
+│   │   └── analyzer.py             # AI分析ロジック
 │   │
 │   ├── social_posting/             # 投稿モジュール
 │   │   ├── __init__.py
@@ -323,7 +324,7 @@ MarketAlgoX/
     ・各銘柄の詳細データと新規フラグを含める
     ↓
 [5] AI分析フェーズ (6:26 - 6:30)
-    ・JSONデータをGemini 3 Pro APIに送信
+    ・JSONデータをOpenAI GPT-4o APIに送信
     ・各スクリーナーでオススメ銘柄を1つ選定
     ・選定理由を生成
     ・Industry Group傾向を分析
@@ -525,27 +526,33 @@ class JSONExporter:
 ### 7.5 AI分析モジュール (AI Analysis Module)
 
 #### 7.5.1 概要
-Gemini 3 Pro APIを使用してスクリーニング結果を分析します。
+OpenAI GPT-4o APIを使用してスクリーニング結果を分析します。
 
-#### 7.5.2 主要クラス: `GeminiClient`
+#### 7.5.2 主要クラス: `OpenAIClient`
 
 ```python
-class GeminiClient:
-    """Gemini 3 Pro APIクライアント"""
+class OpenAIClient:
+    """OpenAI APIクライアント"""
 
-    def __init__(self, api_key: str):
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-3-pro')
+    def __init__(self, api_key: str, model: str = "gpt-4o"):
+        from openai import OpenAI
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
 
-    def generate_content(self, prompt: str) -> str:
+    def generate_content(self, prompt: str, use_search: bool = False) -> str:
         """コンテンツ生成"""
-        response = self.model.generate_content(prompt)
-        return response.text
+        if use_search:
+            prompt = f"{prompt}\n\n※最新の市場動向や決算情報を考慮して回答してください。"
 
-    def analyze_with_json(self, json_data: dict) -> str:
-        """JSONデータを使って分析"""
-        pass
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "あなたは米国株式市場の専門アナリストです。"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content
 ```
 
 #### 7.5.3 主要クラス: `ScreenerAnalyzer`
@@ -554,8 +561,8 @@ class GeminiClient:
 class ScreenerAnalyzer:
     """スクリーニング結果分析"""
 
-    def __init__(self, gemini_client: GeminiClient):
-        self.gemini_client = gemini_client
+    def __init__(self, openai_api_key: str, model: str = "gpt-4o"):
+        self.openai_client = OpenAIClient(openai_api_key, model)
 
     def analyze_screening_results(self, json_file_path: str) -> dict:
         """
@@ -1093,22 +1100,28 @@ CREATE TABLE post_history (
    - エンドポイント: `/earnings-surprises/{ticker}`
    - パラメータ: `?apikey={API_KEY}`
 
-### 10.2 Gemini 3 Pro API
+### 10.2 OpenAI GPT-4o API
 
-**SDKライブラリ**: `google-generativeai`
+**SDKライブラリ**: `openai`
 
 **主要メソッド**:
 
 ```python
-import google.generativeai as genai
+from openai import OpenAI
 
 # 設定
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-3-pro')
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # コンテンツ生成
-response = model.generate_content(prompt)
-text = response.text
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "あなたは米国株式市場の専門アナリストです。"},
+        {"role": "user", "content": prompt}
+    ],
+    temperature=0.7
+)
+text = response.choices[0].message.content
 ```
 
 **プロンプト設計**:
@@ -1194,8 +1207,9 @@ for text in thread_texts:
 FMP_API_KEY=your_fmp_api_key_here
 FMP_RATE_LIMIT=750
 
-# Gemini API
-GEMINI_API_KEY=your_gemini_api_key_here
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o
 
 # X (Twitter) API
 X_API_KEY=your_x_api_key_here
@@ -1228,11 +1242,12 @@ TZ=Asia/Tokyo
 3. Premium Plan ($29/月) 以上を契約（推奨: 750 req/min）
 4. ダッシュボードからAPI Keyを取得
 
-#### 11.2.2 Gemini API
-1. https://ai.google.dev/ にアクセス
-2. Googleアカウントでログイン
-3. "Get API Key" をクリック
-4. API Keyを生成
+#### 11.2.2 OpenAI API
+1. https://platform.openai.com/ にアクセス
+2. アカウントでログイン
+3. "API Keys" に移動
+4. "Create new secret key" をクリック
+5. API Keyをコピーして保存
 
 #### 11.2.3 X (Twitter) API
 1. https://developer.twitter.com/ にアクセス
@@ -1433,7 +1448,7 @@ docker-compose exec app crontab -l
   - ログに警告を記録
 
 ### 14.3 AI分析エラー
-- **Gemini API エラー**:
+- **OpenAI API エラー**:
   - レート制限: 待機後リトライ
   - 無効なレスポンス: デフォルト分析結果を使用
   - ネットワークエラー: 3回までリトライ
@@ -1510,7 +1525,7 @@ pytest --cov=src tests/
 
 - **IBD Methodology**: https://www.investors.com/ibd-university/
 - **FinancialModelingPrep API Docs**: https://site.financialmodelingprep.com/developer/docs
-- **Gemini API Docs**: https://ai.google.dev/docs
+- **OpenAI API Docs**: https://platform.openai.com/docs
 - **Twitter API v2 Docs**: https://developer.twitter.com/en/docs/twitter-api
 - **Docker Documentation**: https://docs.docker.com/
 - **Python Best Practices**: https://docs.python-guide.org/
@@ -1521,6 +1536,7 @@ pytest --cov=src tests/
 
 | バージョン | 日付 | 変更内容 | 作成者 |
 |------------|------|----------|--------|
+| 1.2.0 | 2025-12-11 | Gemini APIからOpenAI APIに変更 | Claude |
 | 1.1.0 | 2025-12-11 | スクリーナー名を分かりやすい日本語名に変更 | Claude |
 | 1.0.0 | 2025-12-11 | 初版作成 | Claude |
 
