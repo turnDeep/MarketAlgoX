@@ -880,14 +880,14 @@ RS Ratingが98以上（上位2%）で、移動平均が理想的な上昇トレ�
 
 ### 8.7 スクリーナー名称対応表
 
-| 日本語名 | 英語名 | 略称 |
-|---------|--------|------|
-| 短期中期長期の最強銘柄 | Momentum 97 | M97 |
-| 爆発的EPS成長銘柄 | Explosive Estimated EPS Growth Stocks | EPS爆 |
-| 出来高急増上昇銘柄 | Up on Volume List | 出増 |
-| 相対強度トップ2%銘柄 | Top 2% RS Rating List | RS2% |
-| 急騰直後銘柄 | 4% Bullish Yesterday | 急騰 |
-| 健全チャート銘柄 | Healthy Chart Watch List | 健全 |
+| 日本語名 | 英語名 |
+|---------|--------|
+| 短期中期長期の最強銘柄 | Momentum 97 |
+| 爆発的EPS成長銘柄 | Explosive Estimated EPS Growth Stocks |
+| 出来高急増上昇銘柄 | Up on Volume List |
+| 相対強度トップ2%銘柄 | Top 2% RS Rating List |
+| 急騰直後銘柄 | 4% Bullish Yesterday |
+| 健全チャート銘柄 | Healthy Chart Watch List |
 
 **注意**: JSONデータやプログラム内では日本語名を使用し、参照用に英語名も併記します。
 
