@@ -31,11 +31,14 @@ from src.screeners.screener_names import get_screener_info
 
 def setup_logger():
     """ロガーをセットアップ"""
+    log_dir = './logs'
+    os.makedirs(log_dir, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('./logs/app.log'),
+            logging.FileHandler(os.path.join(log_dir, 'app.log')),
             logging.StreamHandler()
         ]
     )
