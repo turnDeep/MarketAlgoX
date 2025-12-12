@@ -4,6 +4,7 @@ IBD Database Manager
 SQLiteデータベースを使用して、株価、EPS、その他の財務データを集約・管理します。
 """
 
+import os
 import sqlite3
 from typing import List, Dict, Optional
 
@@ -24,6 +25,11 @@ class IBDDatabase:
 
     def initialize_database(self, silent=False):
         """データベースの初期化とテーブル作成"""
+        # データベースファイルのディレクトリが存在することを確認
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
