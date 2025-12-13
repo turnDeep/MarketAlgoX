@@ -4,7 +4,6 @@ IBD Screeners
 データベースに保存された計算済みレーティングを使用してスクリーナーを実行します。
 """
 
-import gspread
 import numpy as np
 from typing import List, Dict, Optional
 
@@ -14,29 +13,12 @@ from ibd_database import IBDDatabase
 class IBDScreeners:
     """データベースを使用したIBDスクリーナー"""
 
-    def __init__(self, credentials_file: str, spreadsheet_name: str, db_path: str = 'ibd_data.db'):
+    def __init__(self, db_path: str = 'ibd_data.db'):
         """
         Args:
-            credentials_file: Googleサービスアカウントの認証情報JSONファイルパス
-            spreadsheet_name: Googleスプレッドシートの名前
             db_path: データベースファイルのパス
         """
         self.db = IBDDatabase(db_path)
-
-        # Google Sheets認証
-        try:
-            self.gc = gspread.service_account(filename=credentials_file)
-        except FileNotFoundError:
-            print(f"エラー: 認証情報ファイル '{credentials_file}' が見つかりません")
-            raise
-
-        # スプレッドシートを開く（存在しない場合は作成）
-        try:
-            self.spreadsheet = self.gc.open(spreadsheet_name)
-        except gspread.SpreadsheetNotFound:
-            self.spreadsheet = self.gc.create(spreadsheet_name)
-            self.spreadsheet.share('', perm_type='anyone', role='reader')
-            print(f"新しいスプレッドシート '{spreadsheet_name}' を作成しました")
 
     def close(self):
         """リソースをクリーンアップ"""
@@ -688,7 +670,7 @@ class IBDScreeners:
             return False
 
     def run_all_screeners(self):
-        """全スクリーナーを実行してGoogleスプレッドシートに出力"""
+        """全スクリーナーを実行して結果を返す"""
         print("\n" + "="*80)
         print("IBD スクリーナー実行開始")
         print("="*80)
@@ -698,9 +680,6 @@ class IBDScreeners:
         if not self.ensure_benchmark_data('SPY'):
             print("\n⚠ 警告: SPYデータが取得できませんでした")
             print("  RS STS%を使用するスクリーナーの結果が制限される可能性があります")
-            print("  続行しますか? (Ctrl+C で中止)")
-            import time
-            time.sleep(3)
 
         # 各スクリーナーを実行
         screener_results = {}
@@ -712,74 +691,11 @@ class IBDScreeners:
         screener_results['4% Bullish Yesterday'] = self.screener_4_percent_bullish_yesterday()
         screener_results['Healthy Chart Watch List'] = self.screener_healthy_chart_watchlist()
 
-        # Googleスプレッドシートに出力
-        print("\nGoogleスプレッドシートに出力中...")
-        self.write_screeners_to_sheet(screener_results)
-
         print("\n" + "="*80)
         print("すべてのスクリーナー実行完了!")
-        print(f"スプレッドシートURL: {self.spreadsheet.url}")
         print("="*80)
 
-    def write_screeners_to_sheet(self, screener_results: Dict[str, List[str]]):
-        """スクリーナー結果をGoogleスプレッドシートに出力"""
-        # データベースから最新の価格データ日付を取得してシート名とする
-        latest_date = self.db.get_latest_price_date()
-        if latest_date:
-            # YYYY-MM-DD形式にフォーマット
-            sheet_name = latest_date
-        else:
-            # 日付が取得できない場合はデフォルト名を使用
-            sheet_name = 'IBD Screeners'
-
-        try:
-            worksheet = self.spreadsheet.worksheet(sheet_name)
-            worksheet.clear()
-        except gspread.WorksheetNotFound:
-            worksheet = self.spreadsheet.add_worksheet(
-                title=sheet_name,
-                rows=500,
-                cols=10
-            )
-
-        current_row = 1
-
-        for screener_name, tickers in screener_results.items():
-            # スクリーナー名を出力
-            worksheet.update(f'A{current_row}', [[screener_name]])
-
-            # ヘッダー行のフォーマット
-            header_format = {
-                'backgroundColor': {'red': 0.2, 'green': 0.4, 'blue': 0.6},
-                'textFormat': {
-                    'bold': True,
-                    'foregroundColor': {'red': 1, 'green': 1, 'blue': 1},
-                    'fontSize': 12
-                },
-                'horizontalAlignment': 'LEFT'
-            }
-            worksheet.format(f'A{current_row}:J{current_row}', header_format)
-            worksheet.merge_cells(f'A{current_row}:J{current_row}')
-            current_row += 1
-
-            # ティッカーを10個ずつ横に並べる
-            if tickers:
-                rows_data = []
-                for i in range(0, len(tickers), 10):
-                    row_tickers = tickers[i:i+10]
-                    while len(row_tickers) < 10:
-                        row_tickers.append('')
-                    rows_data.append(row_tickers)
-
-                if rows_data:
-                    end_row = current_row + len(rows_data) - 1
-                    worksheet.update(f'A{current_row}:J{end_row}', rows_data)
-                    current_row = end_row + 1
-
-            # スクリーナー間に空行を挿入
-            current_row += 1
-
-        print(f"  '{sheet_name}' シートに出力完了")
+        return screener_results
 
 
 def main():
@@ -789,12 +705,10 @@ def main():
 
     load_dotenv()
 
-    CREDENTIALS_FILE = os.getenv('CREDENTIALS_FILE', 'credentials.json')
-    SPREADSHEET_NAME = os.getenv('SPREADSHEET_NAME', 'Market Dashboard')
-
     try:
-        screeners = IBDScreeners(CREDENTIALS_FILE, SPREADSHEET_NAME)
-        screeners.run_all_screeners()
+        screeners = IBDScreeners()
+        results = screeners.run_all_screeners()
+        print(f"結果: {len(results)} スクリーナー完了")
         screeners.close()
 
     except Exception as e:

@@ -60,8 +60,6 @@ def run_screeners(db_path: str) -> dict:
     # 既存のIBDScreenersを使用してスクリーナーを実行
     # Note: Googleスプレッドシート出力は省略し、結果だけを返す
     screeners_obj = IBDScreeners(
-        credentials_file=os.getenv('CREDENTIALS_FILE', 'credentials.json'),
-        spreadsheet_name=os.getenv('SPREADSHEET_NAME', 'Market Dashboard'),
         db_path=db_path
     )
 
