@@ -69,6 +69,8 @@ class XClient:
 
         except Exception as e:
             print(f"Error uploading media: {e}")
+            if "403 Forbidden" in str(e):
+                print("ヒント: X Developer PortalでAppの権限が'Read and Write'になっているか確認してください。")
             return None
 
     def post_tweet(self, text: str, media_ids: List[str] = None) -> dict:
@@ -97,6 +99,9 @@ class XClient:
             }
         except Exception as e:
             print(f"Error posting tweet: {e}")
+            if "403 Forbidden" in str(e):
+                print("ヒント: X Developer PortalでAppの権限が'Read and Write'になっているか確認してください。")
+                print("また、Access Tokenを再生成する必要があるかもしれません。")
             return {
                 "success": False,
                 "error": str(e),
