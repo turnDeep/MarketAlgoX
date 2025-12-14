@@ -23,7 +23,7 @@
 
 ## 概要
 
-MarketAlgoXは、FinancialModelingPrep APIから米国株式データを取得し、IBD（Investor's Business Daily）スタイルのスクリーニングを実行し、OpenAI GPT-4oのAI分析を経てX (Twitter)に自動投稿するシステムです。
+MarketAlgoXは、FinancialModelingPrep APIから米国株式データを取得し、IBD（Investor's Business Daily）スタイルのスクリーニングを実行し、OpenAI GPT-4.1のAI分析を経てX (Twitter)に自動投稿するシステムです。
 
 **動作スケジュール**: 毎日朝6時（日本時間、火〜土曜）に自動実行
 
