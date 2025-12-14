@@ -143,9 +143,8 @@ class ChartGenerator:
             dpi = 100
             figsize = (width / dpi, height / dpi)
 
-            # EMA計算 (High/Lowの21期間)
-            ema_high = df['High'].ewm(span=21, adjust=False).mean()
-            ema_low = df['Low'].ewm(span=21, adjust=False).mean()
+            # EMA計算 (Closeの21期間)
+            ema_close = df['Close'].ewm(span=21, adjust=False).mean()
 
             # チャート生成 (returnfig=TrueでFigureオブジェクトを取得)
             fig, axlist = mpf.plot(
@@ -164,21 +163,8 @@ class ChartGenerator:
             # x軸の値を生成 (mplfinanceの内部表現に合わせる)
             x_vals = np.arange(len(df))
 
-            # EMAプロット
-            ax.plot(x_vals, ema_high, color='gray', linewidth=1, alpha=0.5)
-            ax.plot(x_vals, ema_low, color='gray', linewidth=1, alpha=0.5)
-
-            # クラウドの塗りつぶし条件
-            fill_green = (df['Close'] > ema_high).values
-            fill_red = (df['Close'] < ema_low).values
-            fill_gray = ~(fill_green | fill_red)
-
-            alpha = 0.36 # Pine Scriptのtransparency 64 (alpha ~0.36)
-
-            # 塗りつぶし
-            ax.fill_between(x_vals, ema_high, ema_low, where=fill_green, color='#00c853', alpha=alpha) # Green
-            ax.fill_between(x_vals, ema_high, ema_low, where=fill_red, color='#ff1744', alpha=alpha)   # Red
-            ax.fill_between(x_vals, ema_high, ema_low, where=fill_gray, color='gray', alpha=alpha)
+            # EMAプロット (青色)
+            ax.plot(x_vals, ema_close, color='#2962ff', linewidth=1.5, alpha=0.8, label='21 EMA')
 
             # 保存
             fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
