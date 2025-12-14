@@ -51,7 +51,7 @@ MarketAlgoXは、FinancialModelingPrep APIから米国株式データを取得�
 ## 技術スタック
 
 - **言語**: Python 3.12
-- **AI**: OpenAI GPT-4o API (openai==1.107.1)
+- **AI**: OpenAI GPT-4.1 API (openai==1.107.1)
 - **データソース**: FinancialModelingPrep API
 - **SNS**: X (Twitter) API v2
 - **インフラ**: Docker + Docker Compose + Cron
