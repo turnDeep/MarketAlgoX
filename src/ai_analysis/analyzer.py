@@ -256,8 +256,8 @@ class ScreenerAnalyzer:
 
             print(f"Generating chart for {top_ticker} ({company_name})...")
             try:
-                # ツイート用のシンプルなチャートを生成
-                chart_path = self.chart_generator.generate_simple_line_chart(
+                # ツイート用のチャートを生成（ローソク足）
+                chart_path = self.chart_generator.generate_candlestick_chart(
                     ticker=top_ticker,
                     company_name=company_name,
                     months=3

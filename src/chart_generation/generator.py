@@ -125,13 +125,17 @@ class ChartGenerator:
         try:
             output_path = os.path.join(self.output_dir, f'{ticker}_{months}m.png')
 
+            # 終値の変化率を計算
+            price_change = ((df['Close'].iloc[-1] - df['Close'].iloc[0]) / df['Close'].iloc[0]) * 100
+
             # タイトル作成
-            title = f'{ticker} - {company_name}' if company_name else ticker
-            title += f' ({months} months)'
+            title = f'{company_name} ({ticker})' if company_name else ticker
+            title += f' | {months} months | {price_change:+.2f}%'
 
             # スタイル設定
             # IBDスタイルに近いものを作成するか、既存のスタイルを使用
-            mc = mpf.make_marketcolors(up='#26a69a', down='#ef5350', edge='inherit', wick='inherit', volume='in')
+            # 緑色と赤色を使用
+            mc = mpf.make_marketcolors(up='#00c853', down='#ff1744', edge='inherit', wick='inherit', volume='in')
             s = mpf.make_mpf_style(marketcolors=mc, gridstyle=':', y_on_right=True)
 
             # ピクセルをインチに変換 (100 dpiと仮定)
