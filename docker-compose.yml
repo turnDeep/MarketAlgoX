@@ -9,8 +9,29 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - PYTHONUNBUFFERED=1
+      - FMP_USE_LOCAL=true
+      - FMP_LOCAL_URL=http://fmp_api:8000/api/v3
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./.env:/app/.env
+    depends_on:
+      - fmp_api
+    restart: unless-stopped
+
+  fmp_api:
+    build:
+      context: ./fmp_data_api
+      dockerfile: Dockerfile
+    container_name: fmp_api_server
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tokyo
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./fmp_data_api:/app
     restart: unless-stopped
